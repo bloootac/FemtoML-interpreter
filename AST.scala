@@ -5,8 +5,9 @@ sealed trait Expr
 /*
 expr:
 	- Num number                          | 5067
-	- Character char                           | c
+	- Character char                      | c
 	- Constructor string [expr]           | <"s", [e1, ..., eN]>
+	- Identifier string                   | val
 	- Apply expr expr                     | e1 e2
 	- Fun identifier expr                 | \ i . e
 	- CaseFun [(expr, expr)]              | \ ( p1 -> b1 | ... | pN -> bN)

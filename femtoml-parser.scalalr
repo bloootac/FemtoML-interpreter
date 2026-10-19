@@ -25,7 +25,7 @@ type_expr:
 decl:
 	- ValDec identifier expr              | i = e 
 	- AndDec decl decl                    | d1 and d2
-	- SeqDec decl decl                       | d1 ; d2
+	- SeqDec decl decl                    | d1 ; d2
 	- RecDec decl                         | rec d
 	- HasType identifier type_expr        | i : e
 */
@@ -45,17 +45,20 @@ decl:
 }
 
 
-expr: Expr = Num		{ Num($NUM) }
+expr: Expr = NUM		{ Num($NUM) }
            | CHAR		{ Character($CHAR) }
            | ID                 { Identifier($ID)  }
            | `(` expr `)`       { $expr }
            | `<` ID `,` `[` args: (expr `,`)* `]` `>`
            			{ Constructor($ID, $args) }
            | `\` ID `.` expr    { Fun($ID, $expr) }
-           | `\` `(` cases: ((expr1:expr `->` expr2:expr) `|`)* `)`
+           | `\` `(` cases: (pattern `|`)* `)`
 				{ CaseFun($cases) }
 	   | `let` decl `in` expr 
 	   			{ Let($decl, $expr) }
+
+pattern: (Expr, Expr) =
+           | a:expr `->` b:expr { ($a, $b) }
 
 type_expr: TypeExpr = 
              `Num`              { NumType }
@@ -64,8 +67,8 @@ type_expr: TypeExpr =
            			{ ConstructorType($args) }
            | a:type_expr `->` b:type_expr
            			{ FunType($a, $b) }
-           | `@` `[` args:(ID `,`)* `]`
-           			{ PolyType($args) }
+           | `@` args:(ID `,`)* `.` type_expr
+           			{ PolyType($args, $type_expr) }
 
 decl: Decl =
 	   | ID `=` expr	{ ValDec($ID, $expr) }
@@ -73,5 +76,5 @@ decl: Decl =
 	   			{ AndDec($a, $b) }
 	   | a:decl `;` b:decl  { SeqDec($a, $b) }
 	   | `rec` decl		{ RecDec($decl) }
-	   | ID `:` type_expr	{ HasType($ID, $type_expr }
+	   | ID `:` type_expr	{ HasType($ID, $type_expr) }
 

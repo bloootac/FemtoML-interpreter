@@ -1,4 +1,5 @@
 package femtoml
+
 object AST
 
 sealed trait Expr
@@ -17,9 +18,11 @@ expr:
 case class Num(value: Long) extends Expr
 case class Character(value: Char) extends Expr
 case class Constructor(string: String, args: List[Expr]) extends Expr
+case class Identifier(id: String) extends Expr
 case class Apply(expr1: Expr, expr2: Expr) extends Expr
 case class Fun(arg: String, body: Expr) extends Expr
 case class CaseFun(cases: List[(Expr, Expr)]) extends Expr
+case class Let(decl: Decl, expr: Expr) extends Expr
 
 
 sealed trait TypeExpr
@@ -32,11 +35,11 @@ type_expr:
 	- PolyType [identifier] type_expr     | @ i1, ..., iN. t
 */
 
-case class NumType extends TypeExpr
-case class CharType extends Type Expr
-case class ConstructorType(arg_types: [TypeExpr]) extends TypeExpr
+case class NumType() extends TypeExpr
+case class CharType() extends TypeExpr
+case class ConstructorType(arg_types: List[TypeExpr]) extends TypeExpr
 case class FunType(arg_type: TypeExpr, return_type: TypeExpr) extends TypeExpr
-case class PolyType(vars: [String], body: TypeExpr) extends TypeExpr
+case class PolyType(vars: List[String], body: TypeExpr) extends TypeExpr
 
 
 sealed trait Decl
@@ -52,6 +55,6 @@ case class ValDec(id: String, value: Expr) extends Decl
 case class AndDec(dec1: Decl, dec2: Decl) extends Decl
 case class SeqDec(dec1: Decl, dec2: Decl) extends Decl
 case class RecDec(decl: Decl) extends Decl
-case class HasType(id: String, type: TypeExpr) extends Decl
+case class HasType(id: String, type_expr: TypeExpr) extends Decl
 
 

@@ -26,23 +26,23 @@ expr: Expr = NUM	                                       { Num($NUM) }
            | CHAR		 		                       { Character($CHAR) }
            | ID                                        { Identifier($ID)  }
            | `(` expr `)`                              { $expr }
-           | `<` ID `,` `[` args: (expr `,`)* `]` `>`  { Constructor($ID, $args) }
+           | `<` ID `,` `[` args: (`,` expr)* `]` `>`  { Constructor($ID, $args) }
            | `\` ID `.` expr                           { Fun($ID, $expr) }
-           | `\` `(` cases: (pattern `|`)* `)`         { CaseFun($cases) }
+           | `\` `(` cases: (`|` pattern)* `)`         { CaseFun($cases) }
            | `let` decl `in` expr                      { Let($decl, $expr) }
 
 pattern: (Expr, Expr) = a:expr `->` b:expr             { ($a, $b) }
    			
            			
 type_expr: TypeExpr = type_expr_body                   { $type_expr_body }
-                    | `@` args:(ID `,`)* `.` type_expr { PolyType($args, $type_expr) }
+                    | `@` args:(`,` ID)* `.` type_expr { PolyType($args, $type_expr) }
 
 
 type_expr_body: TypeExpr =
              `Num`                                              { NumType }
            | `Char`                                             { CharType }
            | ID                                                 { VarType($ID) }
-           | `Constructor` `[` args: (type_expr_body `,`)* `]`  { ConstructorType($args) }
+           | `Constructor` `[` args: (`,` type_expr_body)* `]`  { ConstructorType($args) }
            | a:type_expr_body `->` b:type_expr_body             { FunType($a, $b) }
            | `(` type_expr `)`                                  { $type_expr }
            			

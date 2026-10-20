@@ -15,12 +15,12 @@
 	import femtoml.AST._
 }
 
-//=======================================================================
+// =======================================================================
 program: Program = %empty                              { EmptyStmt }
                  | expr `;;` program                   { SeqStmt($expr, $program) }
                  | decl `;;` program                   { SeqStmt($decl, $program) }
 
-//=======================================================================
+// =======================================================================
 expr: Expr = app_expr                                  { $app_expr }
            | `\` ID `.` expr                           { Fun($ID, $expr) }
            | `\` `(` cases: (`|` pattern)* `)`         { CaseFun($cases) }
@@ -37,8 +37,7 @@ const_expr: Expr = NUM                                       { Num($NUM) }
 
 pattern: (Expr, Expr) = a:const_expr `->` b:expr             { ($a, $b) }
    			
-//=======================================================================
-
+// =======================================================================
 type_expr: TypeExpr = type_expr_body                   { $type_expr_body }
                     | `@` args:(`,` ID)* `.` type_expr { PolyType($args, $type_expr) }
 
@@ -51,8 +50,7 @@ type_expr_body: TypeExpr =
            | a:type_expr_body `->` b:type_expr_body             { FunType($a, $b) }
            | `(` type_expr `)`                                  { $type_expr }
            			
-//=======================================================================
-
+// =======================================================================
 decl: Decl =
        | ID `=` expr	                                   { ValDec($ID, $expr) }
 	   | a:decl `and` b:decl                           { AndDec($a, $b) }

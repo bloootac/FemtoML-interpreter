@@ -1,0 +1,60 @@
+%notation FemtoML
+%package femtoml
+%tables lalr
+
+%token NUM(Long) CHAR(Char) ID(String)
+%token `(` `)` `[` `]` `<` `>` `\` `.` `,` `|` `@` `=` `:`
+%token `let` `in` `and` `rec`
+%token `Num` `Char` `Constructor`
+%left `;;` `;` `and`
+%right `->`
+
+%rules
+
+%include {
+	import femtoml.AST._
+}
+
+// =======================================================================
+program: Program = %empty                              { EmptyStmt }
+                 | expr `;;` program                   { SeqStmt($expr, $program) }
+                 | decl `;;` program                   { SeqStmt($decl, $program) }
+
+// =======================================================================
+expr: Expr = app_expr                                  { $app_expr }
+           | `\` ID `.` expr                           { Fun($ID, $expr) }
+           | `\` `(` cases: (`|` pattern)* `)`         { CaseFun($cases) }
+           | `let` decl `in` expr                      { Let($decl, $expr) }
+           
+app_expr: Expr = a:app_expr b:const_expr               { Apply($a, $b) }
+               | const_expr                            { $const_expr }
+               
+const_expr: Expr = NUM                                       { Num($NUM) }
+                 | CHAR		 		                         { Character($CHAR) }
+                 | ID                                        { Identifier($ID)  }
+                 | `<` ID `,` `[` args: (`,` expr)* `]` `>`  { Constructor($ID, $args) }
+                 | `(` expr `)`                              { $expr }
+
+pattern: (Expr, Expr) = a:const_expr `->` b:expr             { ($a, $b) }
+   			
+// =======================================================================
+type_expr: TypeExpr = type_expr_body                   { $type_expr_body }
+                    | `@` args:(`,` ID)* `.` type_expr { PolyType($args, $type_expr) }
+
+
+type_expr_body: TypeExpr =
+             `Num`                                              { NumType }
+           | `Char`                                             { CharType }
+           | ID                                                 { VarType($ID) }
+           | `Constructor` `[` args: (`,` type_expr_body)* `]`  { ConstructorType($args) }
+           | a:type_expr_body `->` b:type_expr_body             { FunType($a, $b) }
+           | `(` type_expr `)`                                  { $type_expr }
+           			
+// =======================================================================
+decl: Decl =
+       | ID `=` expr	                                   { ValDec($ID, $expr) }
+	   | a:decl `and` b:decl                           { AndDec($a, $b) }
+	   | a:decl `;` b:decl                             { SeqDec($a, $b) }
+       | `rec` ID `=` expr		                       { RecDec(ValDec($ID, $expr)) }
+	   | ID `:` type_expr	                           { HasType($ID, $type_expr) }
+

@@ -37,7 +37,7 @@ case object `->` extends Token { val value = (); val symbol = 28 }
 // MAP SYMBOL NUMBERS TO NAMES
 val symbolName: collection.immutable.Map[Int, String] = {
      import org.sufrin.utility.ArrayMap
-    val arr = new Array[String](44)
+    val arr = new Array[String](46)
          locally {
           arr(0) = """$end"""
           arr(1) = """error"""
@@ -71,18 +71,20 @@ val symbolName: collection.immutable.Map[Int, String] = {
           arr(29) = """$accept"""
           arr(30) = """program"""
           arr(31) = """expr"""
-          arr(32) = """pattern"""
-          arr(33) = """type_expr"""
-          arr(34) = """type_expr_body"""
-          arr(35) = """decl"""
-          arr(36) = """S_1_L"""
-          arr(37) = """S_1"""
-          arr(38) = """S_2_L"""
-          arr(39) = """S_2"""
-          arr(40) = """S_3_L"""
-          arr(41) = """S_3"""
-          arr(42) = """S_4_L"""
-          arr(43) = """S_4"""
+          arr(32) = """app_expr"""
+          arr(33) = """const_expr"""
+          arr(34) = """pattern"""
+          arr(35) = """type_expr"""
+          arr(36) = """type_expr_body"""
+          arr(37) = """decl"""
+          arr(38) = """S_1_L"""
+          arr(39) = """S_1"""
+          arr(40) = """S_2_L"""
+          arr(41) = """S_2"""
+          arr(42) = """S_3_L"""
+          arr(43) = """S_3"""
+          arr(44) = """S_4_L"""
+          arr(45) = """S_4"""
          } // locally
          ArrayMap(arr)
      }

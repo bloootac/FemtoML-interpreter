@@ -2,7 +2,16 @@ package femtoml
 
 object AST
 
-sealed trait Expr
+//a program is a list of statements
+sealed trait Program
+case object EmptyStmt extends Program
+case class SeqStmt(head: Statement, tail: Program) extends Program 
+
+//a statement is an expression or a declaration
+sealed trait Statement
+
+sealed trait Expr extends Statement
+
 /*
 expr:
 	- Num number                          | 5067
@@ -30,31 +39,33 @@ sealed trait TypeExpr
 type_expr:
 	- NumType                             | Num
 	- CharType                            | Char
+	- VarType                             | a
 	- ConstructorType [type_exprs]        | Constructor [t1, ..., tN]
 	- FunType type_expr type_expr         | t1 -> t2
 	- PolyType [identifier] type_expr     | @ i1, ..., iN. t
 */
 
-case class NumType() extends TypeExpr
-case class CharType() extends TypeExpr
+case object NumType extends TypeExpr
+case object CharType extends TypeExpr
+case class VarType(id: String) extends TypeExpr
 case class ConstructorType(arg_types: List[TypeExpr]) extends TypeExpr
 case class FunType(arg_type: TypeExpr, return_type: TypeExpr) extends TypeExpr
 case class PolyType(vars: List[String], body: TypeExpr) extends TypeExpr
 
 
-sealed trait Decl
+sealed trait Decl extends Statement
 /*
 decl:
 	- ValDec identifier expr              | i = e 
 	- AndDec decl decl                    | d1 and d2
-	- SeqDec decl decl                       | d1 ; d2
+	- SeqDec decl decl                    | d1 ; d2
 	- RecDec decl                         | rec d
 	- HasType identifier type_expr        | i : e
 */
 case class ValDec(id: String, value: Expr) extends Decl
 case class AndDec(dec1: Decl, dec2: Decl) extends Decl
 case class SeqDec(dec1: Decl, dec2: Decl) extends Decl
-case class RecDec(decl: Decl) extends Decl
+case class RecDec(decl: ValDec) extends Decl
 case class HasType(id: String, type_expr: TypeExpr) extends Decl
 
 

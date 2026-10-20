@@ -2,40 +2,11 @@
 %package femtoml
 %tables lalr
 
-/*
-expr:
-	- Num number                          | 5067
-	- Char char                           | c
-	- Constructor string [expr]           | <"s", [e1, ..., eN]>
-	- Identifier string                   | val
-	- Apply expr expr                     | e1 e2
-	- Fun identifier expr                 | \ i . e
-	- CaseFun [(expr, expr)]              | \ ( p1 -> b1 | ... | pN -> bN)
-	- Let decl expr                       | let d in e 
-
-type_expr:
-	- NumType                             | Num
-	- CharType                            | Char
-	- ConstructorType [type_exprs]        | Constructor [t1, ..., tN]
-	- FunType type_expr type_expr         | t1 -> t2
-	- PolyType [identifier] type_expr     | @ i1, ..., iN. t
-	
-	
-
-decl:
-	- ValDec identifier expr              | i = e 
-	- AndDec decl decl                    | d1 and d2
-	- SeqDec decl decl                    | d1 ; d2
-	- RecDec decl                         | rec d
-	- HasType identifier type_expr        | i : e
-*/
-
-
-%token NUM(Long) CHAR(Char) ID(String) `(` `)` `[` `]` `,` `<` `>`
-%token `let` `in` `\` `.` `|`
-%token `Num` `Char` `Constructor` `@`
-%token `=` `and` `rec` `:`
-%left ';' `and`
+%token NUM(Long) CHAR(Char) ID(String)
+%token `(` `)` `[` `]` `<` `>` `\` `.` `,` `|` `@` `=` `:`
+%token `let` `in` `and` `rec`
+%token `Num` `Char` `Constructor`
+%left `;;` `;` `and`
 %right `->`
 
 %rules
@@ -45,36 +16,41 @@ decl:
 }
 
 
-expr: Expr = NUM		{ Num($NUM) }
-           | CHAR		{ Character($CHAR) }
-           | ID                 { Identifier($ID)  }
-           | `(` expr `)`       { $expr }
-           | `<` ID `,` `[` args: (expr `,`)* `]` `>`
-           			{ Constructor($ID, $args) }
-           | `\` ID `.` expr    { Fun($ID, $expr) }
-           | `\` `(` cases: (pattern `|`)* `)`
-				{ CaseFun($cases) }
-	   | `let` decl `in` expr 
-	   			{ Let($decl, $expr) }
+program: Program = %empty                              { EmptyStmt }
+                 | expr `;;` program                   { SeqStmt($expr, $program) }
+                 | decl `;;` program                   { SeqStmt($decl, $program) }
 
-pattern: (Expr, Expr) =
-           | a:expr `->` b:expr { ($a, $b) }
 
-type_expr: TypeExpr = 
-             `Num`              { NumType }
-           | `Char`             { CharType }
-           | `Constructor` `[` args: (type_expr `,`)* `]` 
-           			{ ConstructorType($args) }
-           | a:type_expr `->` b:type_expr
-           			{ FunType($a, $b) }
-           | `@` args:(ID `,`)* `.` type_expr
-           			{ PolyType($args, $type_expr) }
+
+expr: Expr = NUM	                                       { Num($NUM) }
+           | CHAR		 		                       { Character($CHAR) }
+           | ID                                        { Identifier($ID)  }
+           | `(` expr `)`                              { $expr }
+           | `<` ID `,` `[` args: (expr `,`)* `]` `>`  { Constructor($ID, $args) }
+           | `\` ID `.` expr                           { Fun($ID, $expr) }
+           | `\` `(` cases: (pattern `|`)* `)`         { CaseFun($cases) }
+           | `let` decl `in` expr                      { Let($decl, $expr) }
+
+pattern: (Expr, Expr) = a:expr `->` b:expr             { ($a, $b) }
+   			
+           			
+type_expr: TypeExpr = type_expr_body                   { $type_expr_body }
+                    | `@` args:(ID `,`)* `.` type_expr { PolyType($args, $type_expr) }
+
+
+type_expr_body: TypeExpr =
+             `Num`                                              { NumType }
+           | `Char`                                             { CharType }
+           | ID                                                 { VarType($ID) }
+           | `Constructor` `[` args: (type_expr_body `,`)* `]`  { ConstructorType($args) }
+           | a:type_expr_body `->` b:type_expr_body             { FunType($a, $b) }
+           | `(` type_expr `)`                                  { $type_expr }
+           			
 
 decl: Decl =
-	   | ID `=` expr	{ ValDec($ID, $expr) }
-	   | a:decl `and` b:decl
-	   			{ AndDec($a, $b) }
-	   | a:decl `;` b:decl  { SeqDec($a, $b) }
-	   | `rec` decl		{ RecDec($decl) }
-	   | ID `:` type_expr	{ HasType($ID, $type_expr) }
+       | ID `=` expr	                                   { ValDec($ID, $expr) }
+	   | a:decl `and` b:decl                           { AndDec($a, $b) }
+	   | a:decl `;` b:decl                             { SeqDec($a, $b) }
+       | `rec` ID `=` expr		                       { RecDec(ValDec($ID, $expr)) }
+	   | ID `:` type_expr	                           { HasType($ID, $type_expr) }
 

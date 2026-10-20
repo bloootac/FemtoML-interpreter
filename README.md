@@ -9,22 +9,22 @@ TODO: description
 ## Building the interpreter
 ### Parser
 
-ScalaLR is used to generate the parser files. See `femtoml-parser.scalalr` for the reduction rules. These files are already included in this project under `generated/`, but you can re-generate them using this command:
+ScalaLR is used to generate the parser files. See `femtoml-parser.scalalr` for the reduction rules. These files are already included in this project under `generated/`, but you can re-generate them using this command:  
 `PATH_TO_SCALALR/Assets/scalalr femtoml-parser.scalalr`
 
-Compile the parser files:
+Compile the parser files:  
 `scalac   -classpath PATH_TO_SCALALR/Assets/scalalrruntime.jar   -d .   AST.scala   FemtoMLScanner.scala   generated/components/*.scala   test-parser.scala`
 
 
 ## Usage
 
-Currently, the project only contains a parser, which can be run using this command:
+Currently, the project only contains a parser, which can be run using this command:  
 `scala run . --main-class TestParser --classpath PATH_TO_SCALALR/Assets/scalalrruntime.jar`
 
 The program repeatedly accepts a FemtoML program as terminal input and attempts to parse it. If parsing is successful, the AST is printed. Otherwise, ideally, an error message is displayed. 
 
 Example usage:
-```
+```sh
 \(<True, []> -> 't' | <False,[]> -> 'f');;
 └─ACCEPTED
   └─values: SeqStmt

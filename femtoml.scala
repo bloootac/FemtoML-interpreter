@@ -13,7 +13,7 @@ object FemtoML {
 	def main(args: Array[String]): Unit = {
 	
 		//attempt to import and run file if one is given
-		if (!args.isEmpty) runFile()
+		if (!args.isEmpty) runFile(args(0))
 		//run interactive interpreter 
 		runInTerminal()
 		

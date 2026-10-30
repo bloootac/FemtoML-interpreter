@@ -35,7 +35,13 @@ const_expr: Expr = NUM                                       { Num($NUM) }
                  | `<` ID `,` `[` args: (`,` expr)* `]` `>`  { Constructor($ID, $args) }
                  | `(` expr `)`                              { $expr }
 
-pattern: (Expr, Expr) = a:const_expr `->` b:expr             { ($a, $b) }
+patt_expr: Expr  = NUM                                            { Num($NUM) }
+                 | CHAR		 		                              { Character($CHAR) }
+                 | ID                                             { Identifier($ID)  }
+                 | `<` ID `,` `[` args: (`,` patt_expr)* `]` `>`  { Constructor($ID, $args) }
+                 | `(` patt_expr `)`                              { $patt_expr }
+
+pattern: (Expr, Expr) = a:patt_expr `->` b:expr                  { ($a, $b) }
    			
 // =======================================================================
 type_expr: TypeExpr = type_expr_body                   { $type_expr_body }

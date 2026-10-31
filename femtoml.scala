@@ -42,11 +42,12 @@ object FemtoML {
 					
 						// if successful, print AST
 						value.prettyPrint()
+						println("***")
 						
 						// run program through interpreter
 						value match
-							case p : Program => println(evalProgram(p, env))
-					
+							case p : Program => for (i <- evalProgram(p, env)) println(i)
+								
 					// print error message if parsing failed
 					case ERRONEOUS(diagnosis) =>
 						println(diagnosis)

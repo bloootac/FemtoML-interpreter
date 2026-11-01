@@ -16,8 +16,6 @@ TODO: add type-checking
 
 */
 
-
-
 /* ============================================================ */
 
 sealed trait Value
@@ -37,22 +35,23 @@ case class Delay(var exprOrVal: Either[(Env, Expr), Value]) extends Value {
     }
 }
 
+type Ans = Value
+
 /* ============================================================ */
 
 // top-level program evaluation
-def evalProgram(p: Program, env: Env = Map.empty): List[Value] = {
+def evalProgram[A](p: Program, env: Env = Map.empty, cont: List[Value] => A): A = {
 	
 	p match
-		case EmptyStmt => Nil
+		case EmptyStmt => cont(Nil)
 		case SeqStmt(h,t) => {
 			h match
 				// evaluate expression
-				case e : Expr => evalExpr(env, e) :: evalProgram(t,env)
+				case e : Expr => evalExpr(env, e, x => evalProgram(t, env, xs => cont(x::xs)))
+				
 				// evaluate declaration; add to environment
-				case d : Decl => 
-					env ++= evalDecl(env, d)
-					evalProgram(t, env)
-			
+				case d : Decl => evalDecl(env, d, { env2 => env++=env2; evalProgram(t, env, cont) } )
+
 		}
 }
 
@@ -60,156 +59,161 @@ def evalProgram(p: Program, env: Env = Map.empty): List[Value] = {
 /* ============================================================ */
 
 // expression evaluation
-def evalExpr(env: Env, expr: Expr) : Value = {
+def evalExpr[A](env: Env, expr: Expr, cont: Value => A): A = {
 	expr match
 		// primitives
-		case Identifier(id)                 => env(id)
-		case Num(n)                         => NumVal(n)
-		case Character(c)                   => CharVal(c)
+		case Identifier(id)                 => cont(env(id))
+		case Num(n)                         => cont(NumVal(n))
+		case Character(c)                   => cont(CharVal(c))
 		
 		// delay evaluation of Constructor arguments
-		case Constructor(id, args)          => ConstructorVal(id, args.map(x => delay(env, x)))
+		case Constructor(id, args)          => evalConstructorArgs(env, args, vs => cont(ConstructorVal(id, vs)))
 		
 		// delay evaluation of functions 
-		case Fun(arg, body)                 => Closure(env, arg, body)
-		case CaseFun(cases)                 => CaseFunVal(env, cases)
+		case Fun(arg, body)                 => cont(Closure(env, arg, body))
+		case CaseFun(cases)                 => cont(CaseFunVal(env, cases))
 		
 		case Let(decl, body)                =>
-			// create an environment for variables in the declaration
-			val env2 = evalDecl(env, decl)
-			
-			// evaluate the body within the context of the augmented environment
-			evalExpr(env ++ env2, body)
+			// evaluate decl, then evaluate the body with the augmented environment
+			evalDecl(env, decl, env2 => evalExpr(env++env2, body, cont))
 	
 		case Apply(f, x)                    => 
-			// force evaluation of function f 
-			(strictEval(env, f)) match
-			
-				// delay the evaluation of x
-				
-				// add arg -> x to the environment and evaluate f in that context 
-				case Closure(env2, arg, body) => evalExpr(env2 + (arg -> delay(env, x)), body)
+			//force evaluation of function f
+			strictEval(env, f, {
+				//if a closure, add arg -> (delayed x) to the environment and evaluate f in that context
+				case Closure(env2, arg, body) => delay(env, x, v => evalExpr(env2 + (arg -> v), body, cont))
+					
+				//if a case function, attempt to find a matching pattern, and evaluate the corresponding body with the augmented environment
+				case CaseFunVal(env2, cases) => delay(env, x, v => findCase(env2, v, cases, { case(env3, body) => evalExpr(env2 ++ env3, body, cont) }))
+			})
+		
+}
 
-				// attempt to find a matching pattern
-				// evaluate the corresponding body with the augmented environment
-				case CaseFunVal(env2, cases) => 
-					var (env3, body) = findCase(env2, delay(env, x), cases) 
-					evalExpr(env2 ++ env3, body)
-			
+// delay the evaluation of all constructor arguments
+def evalConstructorArgs[A](env: Env, args: List[Expr], cont: List[Value] => A): A = {
+	args match
+		case x::xs => delay(env, x, v => evalConstructorArgs(env, xs, vs => cont(v::vs)))
+		case Nil => cont(Nil)
 		
 }
 
 // strict expression evaluation
-def strictEval(env: Env, expr: Expr): Value = force(evalExpr(env, expr))
+def strictEval[A](env: Env, expr: Expr, cont: Value => A): A = evalExpr(env, expr, x => force(x, cont))
 
 
 // if a value's evaluation has been delayed, force evaluation of it and permanently assign the evaluated result to the value object
-def force(value: Value): Value = {
+def force[A](value: Value, cont: Value => A): A = {
 	value match
 		
 		case d: Delay =>
 			d.exprOrVal match
 				// if the delayed value has already been evaluated, return that 
-				case Right(v) => v
+				case Right(v) => cont(v)
 				
 				// otherwise, force evaluation of the expression, and assign the result to the object
 				// this avoids repeated parameter evaluation
-				case Left((env, expr2)) => {
-					val v = strictEval(env, expr2)
-					d.exprOrVal = Right(v)
-					v
-				}
-				
+				case Left((env, expr2)) => strictEval(env, expr2, v => { d.exprOrVal = Right(v); cont(v) } )
+
 		// if the value's evaluation has not been delayed, return as-is
-		case _ => value 
+		case _ => cont(value) 
 		
 }
 
 
 // delay the evaluation of parameters or declarations
-def delay(env: Env, expr: Expr): Value = {
+def delay[A](env: Env, expr: Expr, cont: Value => A): A = {
 	expr match
-		case Let(decl, body)                => Delay(Left(env, expr))
-		case Apply(f, x)                    => Delay(Left(env, expr))
-		case _                              => evalExpr(env, expr)
+		case Let(decl, body)                => cont(Delay(Left(env, expr)))
+		case Apply(f, x)                    => cont(Delay(Left(env, expr)))
+		case _                              => evalExpr(env, expr, cont)
 }
 
 // given a value and list of cases, attempt to find a matching case
-def findCase(env: Env, value: Value, cases: List[(Expr, Expr)]): (Env, Expr) = {
+def findCase[A](env: Env, value: Value, cases: List[(Expr, Expr)], cont: (Env, Expr) => A): A = {
 
-	for (pat, body) <- cases
-	do 
-		patternMatch(env, pat, value) match
-			case Some(env2) => return (env2, body)
-			case None       => ()
-	
-	throw new Exception("No matches found in case function application")
-	
-		
+	cases match
+		case (pat,body)::xs => patternMatch(env, pat, value, {
+			case Some(env2) => cont(env2, body)
+			case None => findCase(env, value, xs, cont)
+		})
+		case Nil            => throw new Exception("No matches found in case function application")	
 }
 
 // attempt to match a value to a pattern
-def patternMatch(env: Env, pat: Expr, value: Value): Option[Env] = {
+def patternMatch[A](env: Env, pat: Expr, value: Value, cont: Option[Env] => A): A = {
 	pat match
 		// "blindly" match identifier with value 
-		case Identifier(i)                   => Some(Map(i -> value))
+		case Identifier(i)                   => cont(Some(Map(i -> value)))
 		
 		// force evaluation of value, check if number/character matches expression
-		case Num(n)                          => 
-			force(value) match
-				case NumVal(n2) => if (n==n2) Some(Map.empty) else None
-				case _          => None
+		case Num(n)                          => 	
+			force(value, _ match
+				case NumVal(n2) => if (n==n2) cont(Some(Map.empty)) else cont(None)
+				case _          => cont(None)
+			)
 			
 		case Character(c)                    =>
-			force(value) match
-				case CharVal(c2) => if (c==c2) Some(Map.empty) else None
-				case _           => None
+			force(value, _ match
+				case CharVal(c2) => if (c==c2) cont(Some(Map.empty)) else cont(None)
+				case _           => cont(None)
+			)
 			
 		// force evaluation of value, attempt to pattern match each args(i) with args2(i)
 		// only return an environment if all of these matches are successful	
 		case Constructor(id, args)           =>
-			force(value) match
+		
+			force(value, _ match
 				case ConstructorVal(id2, args2) =>
 				
-					if (id == id2 && args.length == args2.length)
-						args.zip(args2).foldLeft(Option(Map.empty[String, Value]): Option[Env]) {
-							case (acc, (a, b)) =>
-								for {
-									env1 <- acc
-									env2 <- patternMatch(env, a, b)
-								} yield env1 ++ env2
-						}
-							
-					else None
+					if (id == id2 && args.length == args2.length) patternMatchConstructorArgs(env, args, args2, x => cont(x))
+					else cont(None)
+					
+				case _                         => cont(None)
+				)
 }
-// rec f = \('a' -> 0 | 'b' -> <bCase, [f 'a']>);; g = \( 0 -> 1 | <bCase, [0]> -> 100);; 
+
+
+// attempt to match a list of patterns to a list of constructor arguments
+// only return a complete environment if every match succeeds
+def patternMatchConstructorArgs[A](env: Env, patArgs: List[Expr], valArgs: List[Value], cont: Option[Env] => A): A = {
+
+	(patArgs, valArgs) match
+		case (p::pats, v::vals) => patternMatch(env, p, v, {
+			case Some(env2) => patternMatchConstructorArgs(env, pats, vals, {
+				case Some(env3) => cont(Some(env2++env3))
+				case None       => cont(None)
+				})
+			case None       => cont(None)
+		})
+		case (Nil, Nil)       => cont(Some(Map.empty))
+		case _                => throw new Exception("Error in evaluating case function application")
+
+}
+
 
 /* ============================================================ */
 
 // declaration evaluation
-def evalDecl(env: Env, decl: Decl): Env = {
+def evalDecl[A](env: Env, decl: Decl, cont: Env => A): A = {
 	decl match
 		// delay evaluation of declarations
-		case ValDec(id, expr) => Map(id -> delay(env, expr))
-
-		case AndDec(d1, d2)   => evalDecl(env,d1) ++ evalDecl(env,d2)
-		case SeqDec(d1, d2)   => { val env2 = evalDecl(env, d1); env2 ++ evalDecl(env++env2, d2) }
+		case ValDec(id, expr) => delay(env, expr, v => cont(Map(id -> v)))
+		
+		case AndDec(d1, d2)   => evalDecl(env, d1, env1 => evalDecl(env, d2, env2 => cont(env1++env2)))
+		
+		case SeqDec(d1, d2)   => evalDecl(env, d1, env2 => evalDecl(env++env2, d2, env3 => cont(env3++env2)))
 		
 		// for now, ignore type declarations
-		case HasType(_, _)    => Map()
+		case HasType(_, _)    => cont(Map())
 		
 		// knot-tying...
 		case RecDec(d)        => {
-			// create a copy of the given environment 
+			// create a copy of the given environment
 			val env2 = scala.collection.mutable.Map.from(env)
 			
-			// evaluate the declaration in that context 
-			val ext = evalDecl(env2, d)
-			
-			// add the closure to the copy of the environment
-			// now the closure references the environment, and the environment references the closure 
-			env2 ++= ext
-
+			// evaluate the declaration in that context, add the closure to the environment copy
+			// not the closyre references the environment, and the environment references the closure
+			evalDecl(env2, d, ext => { env2 ++= ext; cont(ext) })
 			
 		}
 }

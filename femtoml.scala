@@ -46,7 +46,7 @@ object FemtoML {
 						
 						// run program through interpreter
 						value match
-							case p : Program => for (i <- evalProgram(p, env)) println(i)
+							case p : Program => evalProgram(p, env, xs => for (i <- xs) println(i))
 								
 					// print error message if parsing failed
 					case ERRONEOUS(diagnosis) =>

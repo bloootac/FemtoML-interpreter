@@ -35,8 +35,6 @@ case class Delay(var exprOrVal: Either[(Env, Expr), Value]) extends Value {
     }
 }
 
-type Ans = Value
-
 /* ============================================================ */
 
 // top-level program evaluation

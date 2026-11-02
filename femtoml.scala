@@ -8,75 +8,105 @@ object FemtoML {
 	import org.sufrin.scalalr.LRParser._
 	import org.sufrin.utility._
 	import org.sufrin.utility.PrettyPrint._
-	
+
 	import java.nio.file.{Files, Paths}
-	
-	
+
+	import scala.collection.mutable.Map
+	import Console.{GREEN, RED, BLUE, RESET}
+
+
+	val error_str = s"${RED}ERROR:${RESET}"
+	val femtoml_str = s"${BLUE}femtoml>${RESET} "
+
+	// interpreter's main entry point
 	def main(args: Array[String]): Unit = {
-	
+
 		//attempt to import and run file if one is given
-		if (!args.isEmpty) loadFile(args(0))
+		var env = if (!args.isEmpty) loadFiles(args) else Map.empty
+		
 		//run interactive interpreter 
-		runInTerminal()
+		runInTerminal(env)
 		
 	}
-	
-	def runInTerminal(): Unit = {
+
+	// terminal interface for interpreter
+	def runInTerminal(env: Env = Map.empty): Unit = {
 		// TODO: make prettier, allow user to exit script, allow multi-line statements
-		
-		// initialise environment
-		var env : Env = scala.collection.mutable.Map.empty[String, Value]
 		
 		while (true) {
 			// collect one-line user input
-			val program = scala.io.StdIn.readLine() 
+			print(femtoml_str)
+			val program = scala.io.StdIn.readLine()
 			
-			// initialise scanner and parser (TODO: does this need to be in the while block?)
-			val scanner = new FemtoMLScanner(SourceTextCursor(program))
-			val parser  = org.sufrin.scalalr.LRParser.Pull[Token](Components)(scanner.sourceLocation)
-			
-			try {
-				// run parser on input
-				parser.run(scanner.next) match {
-					case ACCEPTED(value) => 
-					
-						// if successful, print AST
-						value.prettyPrint()
-						println("***")
-						
-						// run program through interpreter; print output
-						value match
-							case p : Program => 
-								try
-									evalProgram(p, env, xs => for (i <- xs) println(i))
-								catch
-									// the user has done something wrong
-									case InterpreterException(s) => println(s"ERROR: $s")
-									
-									// I have done something wrong
-									case err                     => println(s"Unexpected error: $err")
-								
-					// print error message if parsing failed
-					case ERRONEOUS(diagnosis) => println(diagnosis)
-				}
+			val res = parseAndInterpret(program, xs => for (x <- xs) println(x), env)
 				
-			} catch {
-					case err                  => println(err)
-			}
+			res match
+				case Left(_)      => ()
+				case Right(err)   => println(s"$error_str $err")
+
 		}
 			
 	}
-	
-	def loadFile(filePath: String): Unit = {
-		val path = Paths.get(filePath)
-		
-		if (Files.exists(path)) {
-			//TODO: run each line in file through interpreter
-			println("File found.")
+
+	// run interpreter on multiple files
+	def loadFiles(filePaths: Array[String]): Env = {
+
+		// initialise environment
+		var env : Env = Map.empty[String, Value]
+
+		for (file <- filePaths) 
+		do
+			val path = Paths.get(file)
 			
-		} else {
-			//TODO: more descriptive error message
-			println("File not found.")
+			if (Files.exists(path)) 
+				val content = scala.io.Source.fromFile(file).getLines().mkString("\n")
+
+				
+				val res = parseAndInterpret(content, xs => for (x <- xs) println(x), env)
+				
+				res match
+					case Left(_)      => println(s"Loaded $file")
+					case Right(err)   => println(s"$error_str: File $file could not be loaded. $err")
+				
+			else
+				println(s"$error_str: File $file not found.")
+				
+		println("Running interpreter in terminal...")
+		env
+	}
+
+	// given a program string, attempt to parse and interpret it
+	def parseAndInterpret[A](program: String, cont: List[Value] => A, env: Env = Map.empty): Either[A, Throwable] = {
+		// initialise scanner and parser
+		val scanner = new FemtoMLScanner(SourceTextCursor(program))
+		val parser  = org.sufrin.scalalr.LRParser.Pull[Token](Components)(scanner.sourceLocation)
+		
+		try {
+			// run parser on input
+			parser.run(scanner.next) match {
+				case ACCEPTED(value) => 
+				
+					// Uncomment to print AST:
+					// value.prettyPrint()
+					// println("***")
+					
+					// run program through interpreter, run continuation on output
+					value match
+						case p : Program => 
+							try
+								Left(evalProgram(p, env, cont))
+							catch
+								case s => Right(s)
+							
+				// print error message if parsing failed
+				case ERRONEOUS(diagnosis) => Right(new Exception(diagnosis))
+				case _                    => Right(new Exception)
+			}
+			
+		} catch {
+				case err                  => Right(err)
+
 		}
 	}
 }
+

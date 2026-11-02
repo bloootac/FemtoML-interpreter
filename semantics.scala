@@ -8,8 +8,6 @@ import scala.collection.mutable.Map
 
 object Semantics
 /*
-TODO: make everything use cps...
-
 TODO: change for better error messages
 
 TODO: add type-checking
@@ -77,7 +75,7 @@ def evalExpr[A](env: Env, expr: Expr, cont: Value => A): A = {
 	
 		case Apply(f, x)                    => 
 			//force evaluation of function f
-			strictEval(env, f, {
+			strictEvalExpr(env, f, {
 				//if a closure, add arg -> (delayed x) to the environment and evaluate f in that context
 				case Closure(env2, arg, body) => delay(env, x, v => evalExpr(env2 + (arg -> v), body, cont))
 					
@@ -96,7 +94,7 @@ def evalConstructorArgs[A](env: Env, args: List[Expr], cont: List[Value] => A): 
 }
 
 // strict expression evaluation
-def strictEval[A](env: Env, expr: Expr, cont: Value => A): A = evalExpr(env, expr, x => force(x, cont))
+def strictEvalExpr[A](env: Env, expr: Expr, cont: Value => A): A = evalExpr(env, expr, x => force(x, cont))
 
 
 // if a value's evaluation has been delayed, force evaluation of it and permanently assign the evaluated result to the value object
@@ -110,7 +108,7 @@ def force[A](value: Value, cont: Value => A): A = {
 				
 				// otherwise, force evaluation of the expression, and assign the result to the object
 				// this avoids repeated parameter evaluation
-				case Left((env, expr2)) => strictEval(env, expr2, v => { d.exprOrVal = Right(v); cont(v) } )
+				case Left((env, expr2)) => strictEvalExpr(env, expr2, v => { d.exprOrVal = Right(v); cont(v) } )
 
 		// if the value's evaluation has not been delayed, return as-is
 		case _ => cont(value) 
@@ -210,7 +208,7 @@ def evalDecl[A](env: Env, decl: Decl, cont: Env => A): A = {
 			val env2 = scala.collection.mutable.Map.from(env)
 			
 			// evaluate the declaration in that context, add the closure to the environment copy
-			// not the closyre references the environment, and the environment references the closure
+			// not the closure references the environment, and the environment references the closure
 			evalDecl(env2, d, ext => { env2 ++= ext; cont(ext) })
 			
 		}

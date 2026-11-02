@@ -31,7 +31,7 @@ case class CaseFunVal(env: Env, cases: List[(Expr, Expr)]) extends Value { overr
 case class Delay(var exprOrVal: Either[(Env, Expr), Value]) extends Value { 
 	override def toString: String = exprOrVal match {
         case Left(_)  => "<unevaluated>"
-        case Right(v) => s"<evaluated: $v>"
+        case Right(v) => v.toString
     }
 }
 

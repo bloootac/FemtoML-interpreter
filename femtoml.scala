@@ -15,7 +15,7 @@ object FemtoML {
 	def main(args: Array[String]): Unit = {
 	
 		//attempt to import and run file if one is given
-		if (!args.isEmpty) runFile(args(0))
+		if (!args.isEmpty) loadFile(args(0))
 		//run interactive interpreter 
 		runInTerminal()
 		
@@ -44,24 +44,30 @@ object FemtoML {
 						value.prettyPrint()
 						println("***")
 						
-						// run program through interpreter
+						// run program through interpreter; print output
 						value match
-							case p : Program => evalProgram(p, env, xs => for (i <- xs) println(i))
+							case p : Program => 
+								try
+									evalProgram(p, env, xs => for (i <- xs) println(i))
+								catch
+									// the user has done something wrong
+									case InterpreterException(s) => println(s"ERROR: $s")
+									
+									// I have done something wrong
+									case err                     => println(s"Unexpected error: $err")
 								
 					// print error message if parsing failed
-					case ERRONEOUS(diagnosis) =>
-						println(diagnosis)
-					case _ =>		
+					case ERRONEOUS(diagnosis) => println(diagnosis)
 				}
 				
 			} catch {
-					case err: java.lang.Error => println(err)
+					case err                  => println(err)
 			}
 		}
 			
 	}
 	
-	def runFile(filePath: String): Unit = {
+	def loadFile(filePath: String): Unit = {
 		val path = Paths.get(filePath)
 		
 		if (Files.exists(path)) {
